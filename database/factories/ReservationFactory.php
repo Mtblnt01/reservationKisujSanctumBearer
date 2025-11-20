@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\User;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Reservation>
@@ -17,8 +18,7 @@ class ReservationFactory extends Factory
     public function definition(): array
     {
         return [
-        'name' => $this->faker->name(),
-        'email' => $this->faker->unique()->safeEmail(),
+        'user_id' => User::inRandomOrder()->first()->id,
         'reservation_time' => $this->faker->dateTimeBetween('+1 days', '+1 month'),
         'guests' => $this->faker->NumberBetween(1,10),
         'note'=>$this->faker->sentence()

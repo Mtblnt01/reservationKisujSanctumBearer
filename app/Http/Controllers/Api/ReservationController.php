@@ -75,8 +75,8 @@ class ReservationController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
         
-        $reservation->delete();
-        return response()->json(['message'=>'Foglalás törölve'], 200);
+    $reservation->delete();
+    return response()->json(['message' => 'Foglalás törölve.'], 200);
 
     }
 

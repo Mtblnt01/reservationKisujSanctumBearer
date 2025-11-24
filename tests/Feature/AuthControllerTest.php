@@ -58,7 +58,13 @@ class AuthControllerTest extends TestCase
     #[Test]
     public function user_can_logout(){
         //Arrange
+            $user = User::factory()->create();
+            $token = $user-createToken('auth_token')->plainTextToken;
         //Act
+            $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('api/logout');
+
         //Assert
+            $response->assertStatus(200)->assertJson(['message' => 'User kijelentkezése sikerült!']);
+
     }
 }

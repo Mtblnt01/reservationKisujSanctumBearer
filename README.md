@@ -1,6 +1,8 @@
 # Tesztek írása
 
 -php artisan make:test AuthControllerTest
+-php artisan make:test ReservationAccessTest
+-php artisan make:test ReservationControllerTest
 
 
 ## tests/Feature/AuthControllerTest.php szerkesztése
@@ -37,7 +39,7 @@
         }
     }
 
-###User tud e kijelentkezni teszt
+### User tud e kijelentkezni teszt
 
 
     #[Test]

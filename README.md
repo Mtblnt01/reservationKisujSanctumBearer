@@ -1,59 +1,324 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Tesztek írása
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+-php artisan make:test AuthControllerTest
 
-## About Laravel
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## tests/Feature/AuthControllerTest.php szerkesztése
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### User tud e regisztrálni test
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+    <?php
+    
+    namespace Tests\Feature;
+    
+    use Illuminate\Foundation\Testing\RefreshDatabase;
+    use Illuminate\Foundation\Testing\WithFaker;
+    use Tests\TestCase;
+    use PHPUnit\Framework\Attributes\Test;
+    
+    class AuthControllerTest extends TestCase
+    {
+        use RefreshDatabase;
+    
+        #[Test]
+        public function user_can_register(){
+            // Arrange
+            $payload = [
+                'name'=> 'mozso',
+                'email'=> 'mozso@moriczref.hu',
+                'password' => 'Jelszo_2025',
+                'password_confirmation' => 'Jelszo_2025',
+            ];
+            // Act
+            $response = $this->postJson('/api/register', $payload);
+            // Assert
+            $response->assertStatus(201)->assertJsonStructure(['message','user']);
+            $this->assertDatabaseHas('users',['email' => 'mozso@moriczref.hu']);
+        }
+    }
 
-## Learning Laravel
+###User tud e kijelentkezni teszt
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+    #[Test]
+    public function user_can_logout(){
+        //Arrange
+            $user = User::factory()->create();
+            $token = $user-createToken('auth_token')->plainTextToken;
+        //Act
+            $response = $this->withHeader('Authorization', 'Bearer '.$token)->postJson('api/logout');
+        //Assert
+            $response->assertStatus(200)->assertJson(['message' => 'User kijelentkezése sikerült!']);
+    }
 
-## Laravel Sponsors
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+‎## tests/Feature/ReservationAccessTest.php szerkesztése
 
-### Premium Partners
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### megnézzük hogy az admin megtudja e nézni az összes foglalás-t
+    <?php
+    
+    namespace Tests\Feature;
+    
+    use App\Models\User;
+    use App\Models\Reservation;
+    use Illuminate\Foundation\Testing\RefreshDatabase;
+    use Tests\TestCase;
+    use PHPUnit\Framework\Attributes\Test;
+    
+    class ReservationAccessTest extends TestCase
+    {
+        use RefreshDatabase;
+    
+        #[Test]
+        public function admin_can_view_all_reservations()
+        {
+            $admin = User::factory()->create(['is_admin' => true]);
+            $user = User::factory()->create();
+            $reservation = Reservation::factory()->create();
+    
+            $response = $this->actingAs($admin)->getJson('/api/reservations');
+    
+            $response->assertStatus(200)
+                     ->assertJsonFragment(['id' => $reservation->id]);
+        }
 
-## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### megnézzük hogy a felhasználó megtudja e nézni a saját foglalásait
+     #[Test]
+        public function user_can_view_own_reservations()
+        {
+            $user = User::factory()->create();
+            $reservation = Reservation::factory()->for($user)->create();
+    
+            $response = $this->actingAs($user)->getJson('/api/reservations');
+    
+            $response->assertStatus(200)
+                     ->assertJsonFragment(['id' => $reservation->id]);
+        }
 
-## Code of Conduct
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Megnézzük hogy egy felhasználó ne tudja megnézni a többi felhasználó foglalásait
 
-## Security Vulnerabilities
+    
+    #[Test]
+    public function user_cannot_view_others_reservation()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+        $response = $this->actingAs($user)->getJson("/api/reservations/{$reservation->id}");
 
-## License
+        $response->assertStatus(403);
+    }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+### Megnézzük hogy a felhasználó tudja a szerkeszteni a saját foglalásait
+
+    #[Test]
+    public function user_can_update_own_reservation()
+    {
+        $user = User::factory()->create();
+        $reservation = Reservation::factory()->for($user)->create();
+
+        $updateData = ['note' => 'Frissített megjegyzés'];
+
+        $response = $this->actingAs($user)->putJson("/api/reservations/{$reservation->id}", $updateData);
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['note' => 'Frissített megjegyzés']);
+    }
+
+
+### Megnézzük hogy a felhasználó más foglalását NE tudja szerkeszteni
+
+    #[Test]
+    public function user_cannot_update_others_reservation()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
+
+        $updateData = ['note' => 'Tiltott frissítés'];
+
+        $response = $this->actingAs($user)->putJson("/api/reservations/{$reservation->id}", $updateData);
+
+        $response->assertStatus(403);
+    }
+
+### Megnézzük hogy a felhasznaló kitudja e törölni a saját foglalásait
+
+    #[Test]
+    public function user_can_delete_own_reservation()
+    {
+        $user = User::factory()->create();
+        $reservation = Reservation::factory()->for($user)->create();
+
+        $response = $this->actingAs($user)->deleteJson("/api/reservations/{$reservation->id}");
+
+        $response->assertStatus(200)
+                 ->assertJson(['message' => 'Foglalás törölve.']);
+    }
+
+### Lekell ellenőrizni hogy a felhasználó netudja más felhasználó foglalását törölni.
+
+    #[Test]
+        public function user_cannot_delete_others_reservation()
+        {
+            $user = User::factory()->create();
+            $otherUser = User::factory()->create();
+            $reservation = Reservation::factory()->for($otherUser)->create();
+    
+            $response = $this->actingAs($user)->deleteJson("/api/reservations/{$reservation->id}");
+    
+            $response->assertStatus(403);
+        }
+    }
+
+
+
+## ‎tests/Feature/ReservationControllerTest.php szerkesztése
+
+### Megnézzük hogy a felhasználó tud e létrehozni foglalásokat
+
+    <?php
+
+    namespace Tests\Feature;
+    
+    use App\Models\User;
+    use App\Models\Reservation;
+    use Illuminate\Foundation\Testing\RefreshDatabase;
+    use Tests\TestCase;
+    use PHPUnit\Framework\Attributes\Test;
+    use Illuminate\Foundation\Testing\WithFaker;
+    
+    class ReservationControllerTest extends TestCase
+    {
+        use RefreshDatabase, WithFaker;
+    
+        #[Test]
+        public function user_can_create_reservation()
+        {
+            $user = User::factory()->create();
+            $payload = [
+                'reservation_time' => now()->addDays(3)->toDateTimeString(),
+                'guests' => 4,
+                'note' => 'Teszt foglalás',
+            ];
+    
+            $response = $this->actingAs($user)->postJson('/api/reservations', $payload);
+    
+            $response->assertStatus(201)
+                     ->assertJsonFragment(['note' => 'Teszt foglalás']);
+            $this->assertDatabaseHas('reservations', ['note' => 'Teszt foglalás']);
+        }
+
+
+### Megnézzük hogy a felhasználó tudja e a saját foglalásait megnézni
+
+     #[Test]
+    public function user_can_view_own_reservations()
+    {
+        $user = User::factory()->create();
+        $reservation = Reservation::factory()->for($user)->create();
+
+        $response = $this->actingAs($user)->getJson('/api/reservations');
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['id' => $reservation->id]);
+    }
+
+
+### Le ellenőrizzük hogy a felhasználó nemtudja e más foglalását megnézni
+
+        #[Test]
+    public function user_cannot_view_others_reservation()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
+
+        $response = $this->actingAs($user)->getJson("/api/reservations/{$reservation->id}");
+
+        $response->assertStatus(403);
+    }
+
+### Megnézzük hogy az admin megtudja e más felhasználók foglalását nézni
+
+        #[Test]
+    public function admin_can_view_all_reservations()
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
+
+        $response = $this->actingAs($admin)->getJson('/api/reservations');
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['id' => $reservation->id]);
+    }
+
+### Megnézzük hogy a felhasználó tudja e szerkeszteni a saját foglalását
+
+    #[Test]
+    public function user_can_update_own_reservation()
+    {
+        $user = User::factory()->create();
+        $reservation = Reservation::factory()->for($user)->create();
+
+        $updateData = ['note' => 'Frissített megjegyzés'];
+
+        $response = $this->actingAs($user)->putJson("/api/reservations/{$reservation->id}", $updateData);
+
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['note' => 'Frissített megjegyzés']);
+        $this->assertDatabaseHas('reservations', ['note' => 'Frissített megjegyzés']);
+    }
+
+### Ellenőrizzük hogy a felhasználó nemtudja más foglalását szerkeszteni
+
+        #[Test]
+    public function user_cannot_update_others_reservation()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
+
+        $updateData = ['note' => 'Tiltott frissítés'];
+
+        $response = $this->actingAs($user)->putJson("/api/reservations/{$reservation->id}", $updateData);
+
+        $response->assertStatus(403);
+    }
+
+### User tudja e sajat foglalasat torolni
+
+        #[Test]
+    public function user_can_delete_own_reservation()
+    {
+        $user = User::factory()->create();
+        $reservation = Reservation::factory()->for($user)->create();
+
+        $response = $this->actingAs($user)->deleteJson("/api/reservations/{$reservation->id}");
+
+        $response->assertStatus(200)
+                 ->assertJson(['message' => 'Foglalás törölve.']);
+        $this->assertDatabaseMissing('reservations', ['id' => $reservation->id]);
+    }
+
+### User nemtud mas foglalast törölni
+
+     #[Test]
+    public function user_cannot_delete_others_reservation()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $reservation = Reservation::factory()->for($otherUser)->create();
+
+        $response = $this->actingAs($user)->deleteJson("/api/reservations/{$reservation->id}");
+
+            $response->assertStatus(403);
+        }
+    }
+
